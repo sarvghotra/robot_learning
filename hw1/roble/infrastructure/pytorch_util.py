@@ -14,7 +14,7 @@ _str_to_activation = {
     'softplus': nn.Softplus(),
     'identity': nn.Identity(),
 }
-    
+
 def build_mlp(
         input_size: int,
         output_size: int,
@@ -36,9 +36,22 @@ def build_mlp(
     """
     if isinstance(kwargs["params"]["output_activation"], str):
         output_activation = _str_to_activation[kwargs["params"]["output_activation"]]
+
     # TODO: return a MLP. This should be an instance of nn.Module
     # Note: nn.Sequential is an instance of nn.Module.
-    raise NotImplementedError
+
+    mlp = nn.Sequential()
+
+    n_lyrs = len(kwargs["params"]["layer_sizes"])
+    for i, lyr_sz, act in zip(range(n_lyrs), kwargs["params"]["layer_sizes"], kwargs["params"]["activations"]):
+        mlp.add_module(f"lyr{i}", nn.Linear(input_size, lyr_sz))
+        activation = _str_to_activation[act]
+        mlp.add_module(f"act{i}", activation)
+        input_size = lyr_sz
+
+    mlp.add_module("out_lyr", nn.Linear(lyr_sz, output_size))
+    mlp.add_module(f"out_act", output_activation)
+    return mlp
 
 device = None
 

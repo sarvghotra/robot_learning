@@ -1,8 +1,12 @@
 from collections import OrderedDict
 import numpy as np
 import time
+import os
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 
-from IPython import embed
+# from IPython import embed
 import gym
 import torch, pickle
 from omegaconf import DictConfig, OmegaConf
@@ -52,6 +56,7 @@ class RL_Trainer(object):
 
         # Maximum length for episodes
         # self.params['env']['max_episode_length'] = self._params['env']['max_episode_length'] or self._env.spec.max_episode_steps
+        global MAX_VIDEO_LEN
         MAX_VIDEO_LEN = self._params['env']['max_episode_length']
 
         # Is this env continuous, or self._discrete?
@@ -78,7 +83,7 @@ class RL_Trainer(object):
         #############
         ## the **self._params['alg'] is a hack to allow new updates to use kwargs nicely
         self._agent = agent_class(self._env, self._params['alg'], **self._params["env"])
-        
+
     def create_env(self, env_name, seed):
         import pybullet_envs
         self._env = gym.make(env_name)
@@ -86,8 +91,8 @@ class RL_Trainer(object):
         np.random.seed(seed)
         torch.manual_seed(seed)
         print ("self._env:", self._env)
-        
-        
+
+
 
     def run_training_loop(self, n_iter, collect_policy, eval_policy,
                         initial_expertdata=None, relabel_with_expert=False,
@@ -105,6 +110,9 @@ class RL_Trainer(object):
         # init vars at beginning of training
         self._total_envsteps = 0
         self._start_time = time.time()
+
+        if not os.path.exists(os.path.join(self._params['logging']['logdir'], "figs")):
+            os.mkdir(os.path.join(self._params['logging']['logdir'], "figs"))
 
         for itr in range(n_iter):
             print("\n\n********** Iteration %i ************"%itr)
@@ -142,16 +150,25 @@ class RL_Trainer(object):
                 idm_training_logs = self.train_idm()
 
                 # TODO: create a figure from the loss curve in idm_training_logs and add it to your report
-                figure = None
-                
+                x_axis = range(len(idm_training_logs))
+                y_axis = [x['Training Loss IDM'] for x in idm_training_logs]
+                # figure =
+                plt.plot(x_axis, y_axis)
+                plt.ylabel('Loss')
+                plt.xlabel('Training steps')
+                fig_output_path = os.path.join(self._params['logging']['logdir'], "figs", f"idm_train_loss_{itr}.png")
+                plt.savefig(fig_output_path)
+
                 # Don't change
                 self._agent.reset_replay_buffer()
                 self._params['env']['expert_data'] = self._params['env']['expert_unlabelled_data']
+
+                # FIXME: I am not sure if I was supposed to change it
                 unlabelled_data = self.collect_training_trajectories(
                     itr,
-                    initial_expertdata,
-                    collect_policy,
-                    self._params['alg']['batch_size']
+                    load_initial_expertdata=self._params['env']['expert_data'],
+                    collect_policy=collect_policy,
+                    batch_size=self._params['alg']['batch_size']
                 )
                 paths, envsteps_this_batch, train_video_paths = unlabelled_data
                 self._agent.use_idm(paths)
@@ -161,9 +178,9 @@ class RL_Trainer(object):
                 self._params['env']['expert_data'] = "/".join(path_list)
                 labelled_data = self.collect_training_trajectories(
                     itr,
-                    initial_expertdata,
-                    collect_policy,
-                    self._params['alg']['batch_size']
+                    load_initial_expertdata=self._params['env']['expert_data'],
+                    collect_policy=collect_policy,
+                    batch_size=self._params['alg']['batch_size']
                 )
                 paths, envsteps_this_batch, train_video_paths = labelled_data
                 self._agent.reset_replay_buffer()
@@ -211,13 +228,18 @@ class RL_Trainer(object):
             # ``` return loaded_paths, 0, None ```
 
             # (2) collect `self.params['batch_size']` transitions
+        if itr == 0:
+            loaded_paths = np.load(load_initial_expertdata, allow_pickle=True)
+            return loaded_paths, 0, None
+
         # TODO collect `batch_size` samples to be used for training
         # HINT1: use sample_trajectories from utils
         # HINT2: you want each of these collected rollouts to be of length self.params['ep_len']
 
         print("\nCollecting data to be used for training...")
 
-        paths, envsteps_this_batch = TODO
+        # TODO implemented
+        paths, envsteps_this_batch = utils.sample_trajectories(self._env, collect_policy, self._params['alg']['batch_size'], self._params['env']['max_episode_length'])
         # collect more rollouts with the same policy, to be saved as videos in tensorboard
         # note: here, we collect MAX_NVIDEO rollouts, each of length MAX_VIDEO_LEN
 
@@ -235,12 +257,12 @@ class RL_Trainer(object):
             # TODO sample some data from the data buffer
             # HINT1: use the agent's sample function
             # HINT2: how much data = self._params['train_batch_size']
-            ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch = TODO
+            ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch = self._agent.sample(self._params['alg']['train_batch_size'])
 
             # TODO use the sampled data to train an agent
             # HINT: use the agent's train function
             # HINT: keep the agent's training log for debugging
-            train_log = TODO
+            train_log = self._agent.train(ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch)
             all_logs.append(train_log)
         return all_logs
 
@@ -251,12 +273,12 @@ class RL_Trainer(object):
             # TODO sample some data from the data buffer
             # HINT1: use the agent's sample function
             # HINT2: how much data = self._params['train_batch_size']
-            ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch = TODO
+            ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch = self._agent.sample(self._params['alg']['train_batch_size'])
 
             # TODO use the sampled data to train an agent
             # HINT: use the agent's train_idm function
             # HINT: keep the agent's training log for debugging
-            train_log = TODO
+            train_log = self._agent.train_idm(ob_batch, ac_batch, re_batch, next_ob_batch, terminal_batch)
             all_logs.append(train_log)
         return all_logs
 
@@ -266,6 +288,9 @@ class RL_Trainer(object):
         # TODO relabel collected obsevations (from our policy) with labels from an expert policy
         # HINT: query the policy (using the get_action function) with paths[i]["observation"]
         # and replace paths[i]["action"] with these expert labels
+        for i in range(len(paths)):
+            expert_actions = self._agent._actor.get_action(paths[i]["observation"])
+            paths[i]["action"] = expert_actions
         return paths
 
     ####################################
@@ -298,7 +323,7 @@ class RL_Trainer(object):
             # episode lengths, for logging
             train_ep_lens = [len(path["reward"]) for path in paths]
             eval_ep_lens = [len(eval_path["reward"]) for eval_path in eval_paths]
-            
+
             # decide what to log
             logs = OrderedDict()
 
@@ -319,7 +344,7 @@ class RL_Trainer(object):
             for key in logs.keys():
                 value = utils.flatten(logs[key])
                 self._logger.record_tabular_misc_stat(key, value)
-                
+
             # self._logger.record_tabular_misc_stat("eval_reward", logs["eval_reward"])
             self._logger.dump_tabular()
             print('Done logging...\n\n')

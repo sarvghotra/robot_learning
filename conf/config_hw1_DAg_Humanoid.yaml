@@ -2,7 +2,7 @@ env:
   expert_policy_file: ../../../hw1/roble/policies/experts/Humanoid.pkl # Relative to where you're running this script from
   expert_data: ../../../hw1/roble/expert_data/expert_data_Humanoid-v2.pkl  # Relative to where you're running this script from
   expert_unlabelled_data: ../../../hw1/roble/expert_data/unlabelled/unlabelled_data_Humanoid-v2.pkl  # Relative to where you're running this script from
-  exp_name: "Humanoid-v2-DAg"
+  exp_name: "q2-2_dag_humanoid"
   env_name: Humanoid-v2 # choices are [Ant-v2, Humanoid-v2, Walker2d-v2, HalfCheetah-v2, Hopper-v2]
   max_episode_length: 1000
   render: true

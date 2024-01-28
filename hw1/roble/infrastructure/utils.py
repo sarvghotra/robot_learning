@@ -1,12 +1,16 @@
 import numpy as np
 import time
+import torch
+
+from hw1.roble.infrastructure import pytorch_util as ptu
 
 ############################################
 ############################################
 
 def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('rgb_array')):
     # initialize env for the beginning of a new rollout
-    ob = TODO # HINT: should be the output of resetting the env
+    # ob = TODO # HINT: should be the output of resetting the env
+    ob = env.reset()
     obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
     steps = 0
     while True:
@@ -24,11 +28,13 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
                 time.sleep(env.model.opt.timestep)
         # use the most recent ob to decide what to do
         obs.append(ob)
-        ac = TODO # HINT: query the policy's get_action function
+        # ac = TODO # HINT: query the policy's get_action function
+        # FIXME: make sure detach is correct here
+        ac = policy.get_action(ob)    # .detach().cpu().numpy()
         ac = ac[0]
         acs.append(ac)
         ob, rew, done, _ = env.step(ac)
-        
+
         # record result of taking that action
         next_obs.append(ob)
         rewards.append(rew)
@@ -39,7 +45,9 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
 
         # TODO end the rollout if the rollout ended
         # HINT: rollout can end due to done, or due to max_path_length
-        rollout_done = TODO # HINT: this is either 0 or 1
+        rollout_done = 0
+        if done or steps >= max_path_length:
+            rollout_done = 1    # TODO # HINT: this is either 0 or 1
         terminals.append(rollout_done)
 
         if rollout_done:
@@ -57,7 +65,10 @@ def sample_trajectories(env, policy, min_timesteps_per_batch, max_path_length, r
     timesteps_this_batch = 0
     paths = []
     while timesteps_this_batch <= min_timesteps_per_batch:
-        TODO
+        trajectory = sample_trajectory(env, policy, max_path_length, render=render, render_mode=render_mode)
+        timesteps_this_batch += get_pathlength(trajectory)
+        # TODO
+        paths.append(trajectory)
     return paths, timesteps_this_batch
 
 def sample_n_trajectories(env, policy, ntraj, max_path_length, render=False, render_mode=('rgb_array')):
@@ -68,7 +79,10 @@ def sample_n_trajectories(env, policy, ntraj, max_path_length, render=False, ren
         Hint1: use sample_trajectory to get each path (i.e. rollout) that goes into paths
     """
     paths = []
-    TODO
+    # TODO
+    for n in range(ntraj):
+        # for reference: paths, envsteps_this_batch = utils.sample_trajectories(self._env, collect_policy, self.params['batch_size'], self.params['ep_len'])
+        paths.append(sample_trajectory(env, policy, max_path_length, render, render_mode))
     return paths
 
 ############################################
@@ -114,7 +128,7 @@ def get_pathlength(path):
 def flatten(matrix):
     ## Check and fix a matrix with different length lists.
     import collections.abc
-    if (isinstance(matrix, (collections.abc.Sequence,))  and 
+    if (isinstance(matrix, (collections.abc.Sequence,))  and
         isinstance(matrix[0], (collections.abc.Sequence, np.ndarray))): ## Flatten possible inhomogeneous arrays
         flat_list = []
         for row in matrix:

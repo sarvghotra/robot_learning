@@ -44,6 +44,7 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
                     self._learning_rate
                 )
             else:
+                self._norm_dist = torch.distributions.normal.Normal(torch.tensor([0.0] * self._ac_dim), torch.tensor([1.0] * self._ac_dim))
                 self._logstd = nn.Parameter(
                     torch.zeros(self._ac_dim, dtype=torch.float32, device=ptu.device)
                 )
@@ -76,9 +77,15 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
 
     # query the policy with observation(s) to get selected action(s)
     def get_action(self, obs: np.ndarray) -> np.ndarray:
-        # TODO: 
+        # TODO:
         ## Provide the logic to produce an action from the policy
-        pass
+        # FIXME: double check if we need don't need backprop here
+        if len(obs.shape) == 1:
+            obs = np.expand_dims(obs, axis=0)
+        t_obs = torch.from_numpy(obs).float().to(ptu.device)
+        with torch.no_grad():
+            action = self.forward(t_obs).cpu().numpy()
+        return action
 
     # update/train this policy
     def update(self, observations, actions, **kwargs):
@@ -97,11 +104,15 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         else:
             if self._deterministic:
                 ##  TODO output for a deterministic policy
-                action_distribution = TODO
+                # action_distribution = TODO
+                action_distribution = self._mean_net(observation)
             else:
-                
+
                 ##  TODO output for a stochastic policy
-                action_distribution = TODO
+                # action_distribution = TODO
+                # FIXME: double check it with another implementation
+                z = self._norm_dist.sample().to(ptu.device)
+                action_distribution = self._mean_net(observation) + z * self._logstd
         return action_distribution
     ##################################
 
@@ -129,9 +140,17 @@ class MLPPolicySL(MLPPolicy):
         self, observations, actions,
         adv_n=None, acs_labels_na=None, qvals=None
         ):
-        
+
+        self._optimizer.zero_grad()
         # TODO: update the policy and return the loss
-        loss = TODO
+        t_actions = torch.from_numpy(actions).to(ptu.device)
+        t_observations = torch.from_numpy(observations).to(ptu.device)
+        pred_actions = self.forward(t_observations)
+        loss = self._loss(pred_actions, t_actions)
+        loss.backward()
+        self._optimizer.step()
+        # FIXME: remove print
+        # print("loss: ", ptu.to_numpy(loss))
         return {
             'Training Loss': ptu.to_numpy(loss),
         }
@@ -140,10 +159,22 @@ class MLPPolicySL(MLPPolicy):
         self, observations, actions, next_observations,
         adv_n=None, acs_labels_na=None, qvals=None
         ):
-        
-        
+
+
         # TODO: Create the full input to the IDM model (hint: it's not the same as the actor as it takes both obs and next_obs)
-        loss = TODO
+        # FIXME: guess bases created the input
+        self._optimizer.zero_grad()
+        # TODO: update the policy and return the loss
+        t_actions = torch.from_numpy(actions).float().to(ptu.device)
+        obs_nxt_obs = np.concatenate((observations, next_observations), axis=1)
+        t_obs_nxt_obs = torch.from_numpy(obs_nxt_obs).float().to(ptu.device)
+
+        pred_actions = self.forward(t_obs_nxt_obs)
+        loss = self._loss(pred_actions, t_actions)
+        loss.backward()
+        self._optimizer.step()
+        # FIXME: remove print
+        # print("IDM loss: ", ptu.to_numpy(loss))
         return {
             'Training Loss IDM': ptu.to_numpy(loss),
         }
