@@ -91,7 +91,15 @@ class RL_Trainer(object):
 
         combined_params = dict(self._params['alg'].copy())
         combined_params.update(self._params["env"])
+        try:
+            for key in self._params.keys():
+                if "env" in key or "alg" in key:
+                    continue
+                combined_params[key] = self._params[key]
+        except:
+            pass
 
+        self.add_wrappers()
         self._agent = agent_class(self._env, **combined_params)
 
     def create_env(self, env_name, seed):
@@ -102,13 +110,6 @@ class RL_Trainer(object):
         self._eval_env.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
-        print ("self._env:", self._env)
-
-
-
-
-    def set_comet_logger(self, logger):
-        self._logger.set_comet_logger(logger)
 
     def run_training_loop(self, n_iter, collect_policy, eval_policy,
                         initial_expertdata=None, relabel_with_expert=False,
