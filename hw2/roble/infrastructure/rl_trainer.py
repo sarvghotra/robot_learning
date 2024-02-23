@@ -34,7 +34,7 @@ class RL_Trainer(RL_Trainer):
         super().__init__(params, agent_class)
 
         # Make the gym environment
-        print (self._env) 
+        print (self._env)
         self.add_wrappers()
 
         # Are the observations images?
@@ -58,8 +58,8 @@ class RL_Trainer(RL_Trainer):
             self._env = wrappers.Monitor(self._env, os.path.join(self._params['logging']['logdir'], "gym"), force=True)
             self._mean_episode_reward = -float('nan')
             self._best_mean_episode_reward = -float('inf')
-        
-        
+
+
     def run_training_loop(self, n_iter, collect_policy, eval_policy,
                           initial_expertdata=None):
         """
@@ -128,7 +128,7 @@ class RL_Trainer(RL_Trainer):
 
                 if self._params['logging']['save_params']:
                     self._agent.save('{}/agent_itr_{}.pt'.format(self._params['logging']['logdir'], itr))
-        
+
         return self._logger.get_table_dict()
 
     def collect_training_trajectories(
@@ -158,12 +158,14 @@ class RL_Trainer(RL_Trainer):
                 num_transitions_to_sample = self._params['alg']['batch_size_initial']
         else:
             num_transitions_to_sample = self._params['alg']['batch_size']
-    
+
         print("\nCollecting data to be used for training...")
         paths, envsteps_this_batch = utils.sample_trajectories(
             self._env, collect_policy, num_transitions_to_sample, self._params['env']['max_episode_length'])
         # collect more rollouts with the same policy, to be saved as videos in tensorboard
         # note: here, we collect MAX_NVIDEO rollouts, each of length MAX_VIDEO_LEN
+        global MAX_VIDEO_LEN
+        MAX_VIDEO_LEN = self._params['env']['max_episode_length']
 
         train_video_paths = None
         if self._log_video:
@@ -186,7 +188,7 @@ class RL_Trainer(RL_Trainer):
 
     ####################################
     ####################################
-    
+
 
     def perform_logging(self, itr, paths, eval_policy, train_video_paths, all_logs):
 
@@ -196,8 +198,8 @@ class RL_Trainer(RL_Trainer):
 
         # collect eval trajectories, for logging
         print("\nCollecting data for eval...")
-        eval_paths, eval_envsteps_this_batch = utils.sample_trajectories(self._env, eval_policy, 
-                                                                         self._params['alg']['eval_batch_size'], 
+        eval_paths, eval_envsteps_this_batch = utils.sample_trajectories(self._env, eval_policy,
+                                                                         self._params['alg']['eval_batch_size'],
                                                                          self._params['env']['max_episode_length'])
 
         # save eval rollouts as videos in the video folder (for grading)
@@ -207,7 +209,7 @@ class RL_Trainer(RL_Trainer):
                 print('\nSaving train rollouts as videos...')
                 self._logger.log_paths_as_videos(train_video_paths, itr, fps=self._fps, max_videos_to_save=MAX_NVIDEO,
                                             video_title='train_rollouts')
-            
+
             print('\nCollecting video rollouts eval')
             eval_video_paths = utils.sample_n_trajectories(self._env, eval_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True)
             print('\nSaving eval rollouts as videos...')
@@ -254,7 +256,7 @@ class RL_Trainer(RL_Trainer):
             #     print('{} : {}'.format(key, value))
             #     self._logger.log_file(value, key,itr)
             #     self._logger.log_scalar(value, key, itr)
-                
+
             self._logger.record_dict(logs, prefix='trainer/')
             self._logger.dump_tabular(with_prefix=False, with_timestamp=False)
             print('Done logging MBRL...\n\n')
@@ -269,7 +271,7 @@ class RL_Trainer(RL_Trainer):
         action_sequence = action_sequence[0]
 
         # calculate and log model prediction error
-        mpe, true_states, pred_states = utils.calculate_mean_prediction_error(self._env, action_sequence, 
+        mpe, true_states, pred_states = utils.calculate_mean_prediction_error(self._env, action_sequence,
                                                                               self._agent._dyn_models, self._agent._actor._data_statistics)
         print("assert:", self._params['alg']['ob_dim'], " == " , true_states.shape[1], " == ", pred_states.shape[1])
         assert self._params['alg']['ob_dim'] == true_states.shape[1] == pred_states.shape[1]

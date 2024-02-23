@@ -1,5 +1,8 @@
 import numpy as np
 import time
+import torch
+
+from hw1.roble.infrastructure import pytorch_util as ptu
 
 ############################################
 ############################################
@@ -183,4 +186,10 @@ def add_noise(data_inp, noiseToSignal=0.01):
         data[:, j] = np.copy(data[:, j] + np.random.normal(
             0, np.absolute(std_of_noise[j]), (data.shape[0],)))
 
+    return data
+
+def convert_np_to_tensor_on_device(data):
+    if isinstance(data, np.ndarray):
+        data = torch.from_numpy(data)
+    data = data.to(ptu.device)
     return data

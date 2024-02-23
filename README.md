@@ -41,7 +41,7 @@ python run_hw6_sim2real.py alg.n_iter=1
 Assignments for [UdeM roble: Robot Learning Course](https://fracturedplane.com/teaching-new-course-in-robot-learning.html). Based on [Berkeley CS 285: Deep Reinforcement Learning, Decision Making, and Control](http://rail.eecs.berkeley.edu/deeprlcourse/).
 
 
-# Instructions for experiments
+# Instructions for HW1 experiments
 
 ## Q1-2 (BC):
 - Ant-V2: `python run_hw1_bc.py --config-name config_hw1_BC1`

@@ -14,7 +14,7 @@ import numpy as np
 class MBAgent(BaseAgent):
     import hw1.roble.util.class_util as classu
     @classu.hidden_member_initialize
-    def __init__(self, env, params):
+    def __init__(self, env, params, **kwargs):
         super(MBAgent, self).__init__()
 
         self._env = env.unwrapped
@@ -45,14 +45,14 @@ class MBAgent(BaseAgent):
             # select which datapoints to use for this model of the ensemble
             # you might find the num_data_per_env variable defined above useful
 
-            # observations = # TODO(Q1)
-            # actions = # TODO(Q1)
-            # next_observations = # TODO(Q1)
+            observations = ob_no[num_data_per_ens * i : num_data_per_ens * (i + 1)]
+            actions = ac_na[num_data_per_ens * i : num_data_per_ens * (i + 1)]
+            next_observations = next_ob_no[num_data_per_ens * i : num_data_per_ens * (i + 1)]
 
             # # use datapoints to update one of the dyn_models
-            # model =  # TODO(Q1)
+            model =  self._dyn_models[i]
             log = model.update(observations, actions, next_observations,
-                                self._data_statistics)
+                               self._data_statistics)
             loss = log['Training Loss']
             losses.append(loss)
 
@@ -86,7 +86,7 @@ class MBAgent(BaseAgent):
         # so each model in our ensemble can get trained on batch_size data
         return self._replay_buffer.sample_random_data(
             batch_size * self._params["ensemble_size"])
-        
+
     def save(self, path):
         print("NOTE: Nothing to save for MB agent (maybe the models?)")
         return
