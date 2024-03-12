@@ -3,19 +3,20 @@ env:
     max_episode_length: 200
     exp_name: 'todo'
     atari: True
+    render_mode: 'rgb_array'
 
 alg:
     double_q: True
     batch_size: 64 ## The min amount of experience to collect before a training update
     train_batch_size: 64 ## training batch size used for computing gradients of q function or policy
     eval_batch_size: 4096 ## How much experience should be collected over the environment to evaluate the average reward of a policy
-    num_agent_train_steps_per_iter: 2 ## Number of training updates after #batch_size experience is collected. 
+    num_agent_train_steps_per_iter: 2 ## Number of training updates after #batch_size experience is collected.
     num_critic_updates_per_agent_update: 2 ## Number of training updates after #batch_size experience is collected.
-    use_gpu: False
+    use_gpu: True
     gpu_id: 0
     rl_alg: 'td3' ## RL training algorithm ['dqn', 'ddpg', 'td3', 'sac']
     learning_starts: 10000  ## How much initial experience to collect before training begins
-    learning_freq: 1 
+    learning_freq: 1
     target_update_freq: 1
     exploration_schedule: 0
     optimizer_spec:  0
@@ -38,13 +39,13 @@ alg:
     nn_baseline: False
     deterministic: True
     network:
-        layer_sizes: [ 64, 64 ]
-        activations: [ "tanh", "tanh" ]
+        layer_sizes: [ 256, 256]
+        activations: [ "relu", "relu" ]
         output_activation: "identity"
 
 logging:
     video_log_freq: 50000 # How often to generate a video to log/
-    scalar_log_freq: 10000 # How often to log training information and run evaluation during training.
+    scalar_log_freq: 2000 # How often to log training information and run evaluation during training.
     save_params: false # Should the parameters given to the script be saved? (Always...)
     random_seed: 1234
     logdir: ""

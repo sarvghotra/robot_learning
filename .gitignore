@@ -161,4 +161,11 @@ cython_debug/
 
 *.csv
 output/
+outputs/
 run_logs/
+bash_scripts/
+
+error*txt
+output*txt
+
+*.mp4

@@ -20,7 +20,7 @@ class OffPolicyTrainer(object):
         ## SET AGENT PARAMS
         #####################
 
-        additional_params = get_env_kwargs(env_name=params['env']['env_name'])
+        additional_params = get_env_kwargs(env_name=params['env']['env_name'], n_iter=params['alg']['n_iter'])
         if additional_params is not None:
             self._params = merge_params(dict(self._params), dict(additional_params))
             self._params['optimizer_spec'] = additional_params['optimizer_spec']
@@ -33,7 +33,7 @@ class OffPolicyTrainer(object):
         elif self._params['alg']['rl_alg'] == 'ddpg':
             agent = DDPGAgent
         elif self._params['alg']['rl_alg'] == 'td3':
-            agent = TD3Agent    
+            agent = TD3Agent
         elif self._params['alg']['rl_alg'] == 'sac':
             agent = SACAgent
         else:
@@ -55,9 +55,9 @@ class OffPolicyTrainer(object):
             eval_policy = self._rl_trainer._agent._actor,
             )
         return result
-        
 
-def my_app(cfg: DictConfig): 
+
+def my_app(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
     import os
     print("Command Dir:", os.getcwd())

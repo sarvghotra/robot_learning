@@ -30,16 +30,16 @@ class DDPGCritic(BaseCritic):
         kwargs['ob_dim'] = kwargs['ob_dim'] + kwargs['ac_dim']
         kwargs['ac_dim'] = 1
         kwargs['deterministic'] = True
-        self._q_net = ConcatMLP(   
+        self._q_net = ConcatMLP(
                 **kwargs
             )
-        self._q_net_target = ConcatMLP(   
+        self._q_net_target = ConcatMLP(
                 **kwargs
             )
         # self._learning_rate_scheduler = optim.lr_scheduler.LambdaLR(
         #     self._optimizer,
         #     self._optimizer_spec.learning_rate_schedule,
-        # 
+        #
         self._optimizer = optim.Adam(
             self._q_net.parameters(),
             self._learning_rate,
@@ -48,7 +48,9 @@ class DDPGCritic(BaseCritic):
         self._q_net.to(ptu.device)
         self._q_net_target.to(ptu.device)
         self._actor = actor
-        self._actor_target = copy.deepcopy(actor) 
+        self._actor_target = copy.deepcopy(actor)
+        self.polyak_avg = kwargs['polyak_avg']
+        self._gamma = kwargs['gamma']
 
     def update(self, ob_no, ac_na, next_ob_no, reward_n, terminal_n):
         """
@@ -72,21 +74,25 @@ class DDPGCritic(BaseCritic):
         next_ob_no = ptu.from_numpy(next_ob_no)
         reward_n = ptu.from_numpy(reward_n)
         terminal_n = ptu.from_numpy(terminal_n)
-        
-        ### Hint: 
+
+        ### Hint:
         # qa_t_values = self._q_net(ob_no, ac_na)
-        qa_t_values = TODO
-        
-        # TODO compute the Q-values from the target network 
+        q_t_values = self._q_net(ob_no, ac_na)
+        q_t_values = q_t_values.squeeze()
+
+        # TODO compute the Q-values from the target network
         ## Hint: you will need to use the target policy
-        qa_tp1_values = TODO
+        action = self._actor_target(next_ob_no)
+        q_tp1 = self._q_net_target(next_ob_no, action)
 
         # TODO compute targets for minimizing Bellman error
         # HINT: as you saw in lecture, this would be:
             #currentReward + self._gamma * qValuesOfNextTimestep * (not terminal)
-        target = TODO
+        gamma_q_tp1 = self._gamma * q_tp1
+        gamma_q_tp1 = gamma_q_tp1.squeeze()
+        target = reward_n + gamma_q_tp1 * (1.0 - terminal_n)
         target = target.detach()
-        
+
         assert q_t_values.shape == target.shape
         loss = self._loss(q_t_values, target)
 
@@ -108,15 +114,22 @@ class DDPGCritic(BaseCritic):
                 self._q_net_target.parameters(), self._q_net.parameters()
         ):
             ## Perform Polyak averaging
-            y = TODO
+            target_param.data.copy_(self.polyak_avg * target_param + (1.0 - self.polyak_avg) * param)
+
         for target_param, param in zip(
                 self._actor_target.parameters(), self._actor.parameters()
         ):
             ## Perform Polyak averaging for the target policy
-            y = TODO
+            target_param.data.copy_(self.polyak_avg * target_param + (1.0 - self.polyak_avg) * param)
 
     def qa_values(self, obs):
-        obs = ptu.from_numpy(obs)
-        ## HINT: the q function take two arguments  
-        qa_values = TODO
+        if not isinstance(obs, torch.Tensor):
+            obs = ptu.from_numpy(obs)
+
+        # if not isinstance(actions, torch.Tensor):
+        #     actions = ptu.from_numpy(actions)
+
+        ## HINT: the q function take two arguments
+        actions = self._actor.get_action(obs)
+        qa_values = self._q_net(obs, actions)
         return ptu.to_numpy(qa_values)

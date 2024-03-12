@@ -197,7 +197,7 @@ def wrap_deepmind_ram(env):
     env = ClipRewardEnv(env)
     return env
 
-
+from stable_baselines3.common.monitor import Monitor
 def wrap_deepmind(env):
     """Configure environment for DeepMind-style Atari.
     """
@@ -209,6 +209,7 @@ def wrap_deepmind(env):
         env = FireResetEnv(env)
     env = ProcessFrame84(env)
     # FrameStacking
-    #env = FrameStack(env, 4) 
+    # env = FrameStack(env, 4)
     env = ClipRewardEnv(env)
+    # env = Monitor(env)
     return env

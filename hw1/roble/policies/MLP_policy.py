@@ -11,6 +11,7 @@ from torch import distributions
 
 from hw1.roble.infrastructure import pytorch_util as ptu
 from hw1.roble.policies.base_policy import BasePolicy
+from hw3.roble.utils.policy_utils import SquashedNormal
 
 
 class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
@@ -35,7 +36,8 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             self._logits_na = None
             self._mean_net = ptu.build_mlp(input_size=self._ob_dim,
                                       output_size=self._ac_dim,
-                                      params=self._network)
+                                      params=self._network,
+                                      is_critic=self._is_critic)
             self._mean_net.to(ptu.device)
 
             if self._deterministic:
@@ -75,6 +77,12 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
 
     ##################################
 
+    def scale_action(self, raw_action):
+        # scaled_action = self._action_scale * raw_action
+        # return scaled_action
+        # FIXME
+        return raw_action
+
     # query the policy with observation(s) to get selected action(s)
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         # TODO:
@@ -84,8 +92,13 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             obs = np.expand_dims(obs, axis=0)
         t_obs = torch.from_numpy(obs).float().to(ptu.device)
         with torch.no_grad():
-            action = self.forward(t_obs).cpu().numpy()
-        return action
+            action = self.forward(t_obs)
+
+        if isinstance(action, distributions.distribution.Distribution):
+            action = action.rsample()
+
+        # action = self.scale_action(action)
+        return ptu.to_numpy(action)
 
     # update/train this policy
     def update(self, observations, actions, **kwargs):
@@ -106,13 +119,17 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
                 ##  TODO output for a deterministic policy
                 # action_distribution = TODO
                 action_distribution = self._mean_net(observation)
+                # FIXME
+                action_distribution = self._action_scale * action_distribution
             else:
 
                 ##  TODO output for a stochastic policy
                 # action_distribution = TODO
                 # FIXME: double check it with another implementation
-                z = self._norm_dist.sample().to(ptu.device)
-                action_distribution = self._mean_net(observation) + z * self._logstd
+                # z = self._norm_dist.sample().to(ptu.device)
+                std = torch.exp(self._logstd)
+                # action_distribution = distributions.Normal(self._mean_net(observation), std)
+                action_distribution = SquashedNormal(self._mean_net(observation), std)
         return action_distribution
     ##################################
 

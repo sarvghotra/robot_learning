@@ -228,6 +228,7 @@ class RL_Trainer(object):
             load_initial_expertdata=False,
             collect_policy=None,
             batch_size=0,
+            **kwargs
     ):
         """
         :param itr:
@@ -256,7 +257,7 @@ class RL_Trainer(object):
         print("\nCollecting data to be used for training...")
 
         # TODO implemented
-        paths, envsteps_this_batch = utils.sample_trajectories(self._env, collect_policy, self._params['alg']['batch_size'], self._params['env']['max_episode_length'])
+        paths, envsteps_this_batch = utils.sample_trajectories(self._env, collect_policy, self._params['alg']['batch_size'], self._params['env']['max_episode_length'], **kwargs)
         # collect more rollouts with the same policy, to be saved as videos in tensorboard
         # note: here, we collect MAX_NVIDEO rollouts, each of length MAX_VIDEO_LEN
 
@@ -264,7 +265,7 @@ class RL_Trainer(object):
         if self._log_video:
             print('\nCollecting train rollouts to be used for saving videos...')
             ## TODO look in utils and implement sample_n_trajectories
-            train_video_paths = utils.sample_n_trajectories(self._env, collect_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True)
+            train_video_paths = utils.sample_n_trajectories(self._env, collect_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True, **kwargs)
         return paths, envsteps_this_batch, train_video_paths
 
     def train_agent(self):
@@ -319,7 +320,8 @@ class RL_Trainer(object):
         print("\nCollecting data for eval...")
         eval_paths, eval_envsteps_this_batch = utils.sample_trajectories(self._env, eval_policy,
                                                                          self._params['alg']['eval_batch_size'],
-                                                                         self._params['env']['max_episode_length'])
+                                                                         self._params['env']['max_episode_length'],
+                                                                         render=False, render_mode=self._params['env']['render_mode'])
 
         # save eval rollouts as videos in the video folder (for grading)
         if self._log_video:
@@ -329,7 +331,7 @@ class RL_Trainer(object):
                 self._logger.log_paths_as_videos(train_video_paths, itr, fps=self._fps, max_videos_to_save=MAX_NVIDEO,
                                             video_title='train_rollouts')
             print('\nCollecting video rollouts eval')
-            eval_video_paths = utils.sample_n_trajectories(self._env, eval_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True)
+            eval_video_paths = utils.sample_n_trajectories(self._env, eval_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True, render_mode=self._params['env']['render_mode'])
             print('\nSaving eval rollouts as videos...')
             self._logger.log_paths_as_videos(eval_video_paths, itr, fps=self._fps,max_videos_to_save=MAX_NVIDEO,
                                             video_title='eval_rollouts')

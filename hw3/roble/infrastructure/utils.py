@@ -57,7 +57,7 @@ def mean_squared_error(a, b):
 def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('rgb_array')):
     # TODO: get this from previous assignment
     return Path(obs, image_obs, acs, rewards, next_obs, terminals)
-    
+
 
 ############################################
 ############################################
@@ -122,3 +122,25 @@ def add_noise(data_inp, noiseToSignal=0.01):
             0, np.absolute(std_of_noise[j]), (data.shape[0],)))
 
     return data
+
+
+class OUNoise:
+    """Ornstein-Uhlenbeck process."""
+
+    def __init__(self, size, mu=0., theta=0.15, sigma=0.2):
+        """Initialize parameters and noise process."""
+        self.mu = mu * np.ones(size)
+        self.theta = theta
+        self.sigma = sigma
+        self.reset()
+
+    def reset(self):
+        """Reset the internal state (= noise) to mean (mu)."""
+        self.state = copy.copy(self.mu)
+
+    def sample(self):
+        """Update internal state and return it as a noise sample."""
+        x = self.state
+        dx = self.theta * (self.mu - x) + self.sigma * np.array([np.random.randn() for i in range(len(x))])
+        self.state = x + dx
+        return self.state

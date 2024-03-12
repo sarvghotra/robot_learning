@@ -48,43 +48,29 @@ def merge_params(params1: dict, params2: dict) -> dict:
     merged_params["alg"] = params1_alg
     return merged_params
 
-def get_env_kwargs(env_name):
+def get_env_kwargs(env_name, n_iter: int):
+    kwargs = {
+        'exploration_schedule': None,
+        'optimizer_spec': None,
+    }
     if env_name in ['MsPacman-v0', 'PongNoFrameskip-v4']:
         kwargs = {
-            'learning_starts': 80_000,
-            'target_update_freq': 3_000,
-            'replay_buffer_size': int(1e6),
-            'n_iter': int(2e8),
-            'q_func': create_atari_q_network,
-            'learning_freq': 4,
-            'grad_norm_clipping': 10,
-            'input_shape': (84, 84, 1),
+            'q_func': AtariQNetwork,    # create_atari_q_network
             'env_wrappers': wrap_deepmind,
-            'frame_history_len': 1,
-            'gamma': 0.99,
         }
-        kwargs['optimizer_spec'] = atari_optimizer(kwargs['n_iter'])
-        kwargs['exploration_schedule'] = atari_exploration_schedule(kwargs['n_iter'])
+        kwargs['optimizer_spec'] = atari_optimizer(n_iter)
+        kwargs['exploration_schedule'] = atari_exploration_schedule(n_iter)
 
     elif env_name == 'LunarLander-v3':
         def lunar_empty_wrapper(env):
             return env
         kwargs = {
-            'optimizer_spec': lander_optimizer(),
             'q_func': create_lander_q_network,
-            'replay_buffer_size': 100_000,
-            'batch_size': 32,
-            'gamma': 0.99,
-            'learning_starts': 30_000,
-            'learning_freq': 4,
-            'frame_history_len': 1,
-            'target_update_freq': 3_000,
-            'grad_norm_clipping': 10,
+            'env_wrappers': lunar_empty_wrapper,
+            'optimizer_spec': lander_optimizer(),
             'lander': True,
-            'n_iter': 3_000_000,
-            'env_wrappers': lunar_empty_wrapper
         }
-        kwargs['exploration_schedule'] = lander_exploration_schedule(kwargs['n_iter'])
+        kwargs['exploration_schedule'] = lander_exploration_schedule(n_iter)
 
     else:
         print("Not setting dqn args")
@@ -114,25 +100,70 @@ class PreprocessAtari(nn.Module):
     def forward(self, x):
         if len(x.shape) == 3:
             x = x.unsqueeze(0)
-            
+
         x = x.permute(0, 3, 1, 2).contiguous()
         return x / 255.
 
 
-def create_atari_q_network(ob_dim, num_actions):
-    return nn.Sequential(
-        PreprocessAtari(),
-        nn.Conv2d(in_channels=1, out_channels=32, kernel_size=8, stride=4),
-        nn.ReLU(),
-        nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
-        nn.ReLU(),
-        nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
-        nn.ReLU(),
-        Flatten(),
-        nn.Linear(3136, 512),  # 3136 hard-coded based on img size + CNN layers
-        nn.ReLU(),
-        nn.Linear(512, num_actions),
-    )
+class AtariQNetwork(nn.Module):
+    def __init__(self, ob_dim, num_actions, input_channels=1):
+        super().__init__()
+        # self.preproc_lyr = PreprocessAtari()
+        # self.lyr1 = nn.Conv2d(in_channels=4, out_channels=32, kernel_size=8, stride=4)
+        # self.lyr2 = nn.ReLU()
+        # self.lyr3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2)
+        # self.lyr4 = nn.ReLU()
+        # self.lyr5 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1)
+        # self.lyr6 = nn.ReLU()
+        # self.lyr7 = Flatten()
+        # self.lyr8 = nn.Linear(3136, 512)
+        # self.lyr9 = nn.ReLU()
+        # self.lyr10 = nn.Linear(512, num_actions)
+        self.pre_proc_lyr = PreprocessAtari()
+        self.net = nn.Sequential(
+            nn.Conv2d(in_channels=4, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            Flatten(),
+            nn.Linear(3136, 512),
+            nn.ReLU(),
+            nn.Linear(512, num_actions),
+        )
+
+    def forward(self, input_x):
+        # x = self.preproc_lyr(input_x)
+        # x = self.lyr1(x)
+        # x = self.lyr2(x)
+        # x = self.lyr3(x)
+        # x = self.lyr4(x)
+        # x = self.lyr5(x)
+        # x = self.lyr6(x)
+        # x = self.lyr7(x)
+        # x = self.lyr8(x)
+        # x = self.lyr9(x)
+        # x = self.lyr10(x)
+        input_x = self.pre_proc_lyr(input_x)
+        x = self.net(input_x)
+        return x
+
+
+# def create_atari_q_network(ob_dim, num_actions, input_channels=1):
+#     return nn.Sequential(
+#         PreprocessAtari(),
+#         nn.Conv2d(in_channels=input_channels, out_channels=32, kernel_size=8, stride=4),
+#         nn.ReLU(),
+#         nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+#         nn.ReLU(),
+#         nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+#         nn.ReLU(),
+#         Flatten(),
+#         nn.Linear(3136, 512),  # 3136 hard-coded based on img size + CNN layers
+#         nn.ReLU(),
+#         nn.Linear(512, num_actions),
+#     )
 
 def atari_exploration_schedule(num_timesteps):
     return PiecewiseSchedule(
@@ -354,9 +385,9 @@ def get_wrapper_by_name(env, classname):
 
 
 class MemoryOptimizedReplayBuffer(object):
-    
+
     @classu.hidden_member_initialize
-    def __init__(self, size, frame_history_len, 
+    def __init__(self, size, frame_history_len,
                  lander=False, continuous_actions=False, ac_dim=None):
         """This is a memory efficient implementation of the replay buffer.
 
@@ -429,7 +460,7 @@ class MemoryOptimizedReplayBuffer(object):
             (batch_size, img_h, img_w, img_c * frame_history_len)
             and dtype np.uint8
         act_batch: np.array
-            Array of shape (batch_size,) and dtype np.int32 or 
+            Array of shape (batch_size,) and dtype np.int32 or
             (batch_size,ac_dim) and dtype = np.float32 if continuous actions
         rew_batch: np.array
             Array of shape (batch_size,) and dtype np.float32
@@ -481,7 +512,9 @@ class MemoryOptimizedReplayBuffer(object):
         else:
             # this optimization has potential to saves about 30% compute time \o/
             img_h, img_w = self.obs.shape[1], self.obs.shape[2]
+            # return np.moveaxis(self.obs[start_idx:end_idx].squeeze(), 0, -1)
             return self.obs[start_idx:end_idx].transpose(1, 2, 0, 3).reshape(img_h, img_w, -1)
+
 
     def store_frame(self, frame):
         """Store a single frame in the buffer at the next available index, overwriting
@@ -503,7 +536,7 @@ class MemoryOptimizedReplayBuffer(object):
             self.obs      = np.empty([self._size] + list(frame.shape),     dtype=np.float32 if self._lander else np.uint8)
             ## If discrete actions then just need a list of integers
             ## If continuous actions need a matrix to store action vector for each step
-            self.action   = np.empty([self._size] + list((self._ac_dim,)) if self._continuous_actions else [self._size], 
+            self.action   = np.empty([self._size] + list((self._ac_dim,)) if self._continuous_actions else [self._size],
                                      dtype=np.float32 if self._continuous_actions else np.int32)
             self.reward   = np.empty([self._size],                         dtype=np.float32)
             self.done     = np.empty([self._size],                         dtype=np.bool_)

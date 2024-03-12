@@ -7,10 +7,22 @@ from hw1.roble.infrastructure import pytorch_util as ptu
 ############################################
 ############################################
 
-def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('rgb_array')):
+def make_state(state):
+    state = np.concatenate(state, axis=-1)
+    # if images experiences by agent is less than 4, pad remaining state with 0
+    if state.shape[-1] < 4:
+        padding = np.zeros((84, 84, 4 - state.shape[-1]))
+        state = np.concatenate([state, padding], axis=-1)
+    return state
+
+from collections import deque
+def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('rgb_array'), **kwargs):
     # initialize env for the beginning of a new rollout
     # ob = TODO # HINT: should be the output of resetting the env
     ob = env.reset()
+    if len(ob.shape) == 3:
+        ob_fifo_queue = deque([ob], maxlen=4)
+
     obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
     steps = 0
     while True:
@@ -30,10 +42,18 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
         obs.append(ob)
         # ac = TODO # HINT: query the policy's get_action function
         # FIXME: make sure detach is correct here
-        ac = policy.get_action(ob)    # .detach().cpu().numpy()
-        ac = ac[0]
+        if len(ob.shape) == 3:
+            ac = policy.get_action(make_state(ob_fifo_queue))
+        else:
+            ac = policy.get_action(ob)
+
+        if len(ac.shape) > 1:
+            ac = ac[0]
         acs.append(ac)
         ob, rew, done, _ = env.step(ac)
+
+        if len(ob.shape) == 3:
+            ob_fifo_queue.append(ob)
 
         # record result of taking that action
         next_obs.append(ob)
@@ -54,7 +74,7 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
             break
     return Path(obs, image_obs, acs, rewards, next_obs, terminals)
 
-def sample_trajectories(env, policy, min_timesteps_per_batch, max_path_length, render=False, render_mode=('rgb_array')):
+def sample_trajectories(env, policy, min_timesteps_per_batch, max_path_length, render=False, render_mode=('rgb_array'), **kwargs):
     """
         Collect rollouts until we have collected min_timesteps_per_batch steps.
 
@@ -65,13 +85,13 @@ def sample_trajectories(env, policy, min_timesteps_per_batch, max_path_length, r
     timesteps_this_batch = 0
     paths = []
     while timesteps_this_batch <= min_timesteps_per_batch:
-        trajectory = sample_trajectory(env, policy, max_path_length, render=render, render_mode=render_mode)
+        trajectory = sample_trajectory(env, policy, max_path_length, render=render, render_mode=render_mode, **kwargs)
         timesteps_this_batch += get_pathlength(trajectory)
         # TODO
         paths.append(trajectory)
     return paths, timesteps_this_batch
 
-def sample_n_trajectories(env, policy, ntraj, max_path_length, render=False, render_mode=('rgb_array')):
+def sample_n_trajectories(env, policy, ntraj, max_path_length, render=False, render_mode=('rgb_array'), **kwargs):
     """
         Collect ntraj rollouts.
 
@@ -82,7 +102,7 @@ def sample_n_trajectories(env, policy, ntraj, max_path_length, render=False, ren
     # TODO
     for n in range(ntraj):
         # for reference: paths, envsteps_this_batch = utils.sample_trajectories(self._env, collect_policy, self.params['batch_size'], self.params['ep_len'])
-        paths.append(sample_trajectory(env, policy, max_path_length, render, render_mode))
+        paths.append(sample_trajectory(env, policy, max_path_length, render, render_mode, **kwargs))
     return paths
 
 ############################################

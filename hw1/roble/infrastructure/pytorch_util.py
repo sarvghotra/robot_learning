@@ -40,7 +40,10 @@ def build_mlp(
         params = kwargs
 
     if isinstance(params["output_activation"], str):
-        output_activation = _str_to_activation[params["output_activation"]]
+        if kwargs["is_critic"]:
+            output_activation = _str_to_activation["identity"]
+        else:
+            output_activation = _str_to_activation[params["output_activation"]]
     # TODO: return a MLP. This should be an instance of nn.Module
     # Note: nn.Sequential is an instance of nn.Module.
 
@@ -49,6 +52,7 @@ def build_mlp(
     n_lyrs = len(kwargs["params"]["layer_sizes"])
     for i, lyr_sz, act in zip(range(n_lyrs), kwargs["params"]["layer_sizes"], kwargs["params"]["activations"]):
         mlp.add_module(f"lyr{i}", nn.Linear(input_size, lyr_sz))
+        mlp.add_module(f"lyr_norm{i}", nn.LayerNorm(lyr_sz))
         activation = _str_to_activation[act]
         mlp.add_module(f"act{i}", activation)
         input_size = lyr_sz
@@ -65,6 +69,9 @@ def init_gpu(use_gpu=True, gpu_id=0):
         device = torch.device("cuda:" + str(gpu_id))
         print("Using GPU id {}".format(gpu_id))
     else:
+        print("torch.cuda.is_available(): ", torch.cuda.is_available())
+        print("use_gpu: ", use_gpu)
+        raise RuntimeError("GPU not found")
         device = torch.device("cpu")
         print("GPU not detected. Defaulting to CPU.")
 
