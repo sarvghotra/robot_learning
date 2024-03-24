@@ -1,6 +1,7 @@
 import os
 import time
 import sys
+import comet_ml
 import hydra, json
 
 from hw3.roble.agents.ddpg_agent import DDPGAgent
@@ -47,14 +48,17 @@ class OffPolicyTrainer(object):
         ################
         self._rl_trainer = RL_Trainer(self._params , agent_class =  agent)
 
-    def run_training_loop(self):
 
+    def run_training_loop(self):
         result = self._rl_trainer.run_training_loop(
             self._params['alg']['n_iter'],
             collect_policy = self._rl_trainer._agent._actor,
             eval_policy = self._rl_trainer._agent._actor,
             )
         return result
+
+    def set_comet_logger(self, logger):
+        self._rl_trainer.set_comet_logger(logger)
 
 
 def my_app(cfg: DictConfig):
@@ -96,6 +100,16 @@ def my_app(cfg: DictConfig):
     # cfg = OmegaConf.merge(cfg, params)
     print ("cfg.env:", cfg.env.env_name)
     trainer = OffPolicyTrainer(cfg)
+
+    # For Comet to start tracking a training run,
+    # just add these two lines at the top of
+    # your training script:
+
+    experiment = comet_ml.Experiment(
+    api_key=your key,
+    project_name=project name,
+    workspace="robot-learning"
+    )
 
     data = trainer.run_training_loop()
     print("Results: ", data)
