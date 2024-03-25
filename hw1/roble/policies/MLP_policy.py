@@ -47,7 +47,7 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
                 )
             else:
                 self._std = nn.Parameter(
-                    torch.ones(self._ac_dim, dtype=torch.float32, device=ptu.device) * 0.15
+                    torch.ones(self._ac_dim, dtype=torch.float32, device=ptu.device) * 0.1
                 )
                 self._std.to(ptu.device)
                 if self._learn_policy_std:
