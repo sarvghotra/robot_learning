@@ -23,7 +23,7 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
     if len(ob.shape) == 3:
         ob_fifo_queue = deque([ob], maxlen=4)
 
-    obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
+    obs, acs, rewards, next_obs, terminals, image_obs, infos = [], [], [], [], [], [], []
     steps = 0
     while True:
         if render:  # feel free to ignore this for now
@@ -34,7 +34,7 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
                     else:
                         image_obs.append(env.unwrapped.sim.render(height=500, width=500)[::-1])
                 else:
-                    image_obs.append(env.render(mode=render_mode))
+                    image_obs.append(env._env.render(mode=render_mode))
             if 'human' in render_mode:
                 env.render(mode=render_mode)
                 time.sleep(env.model.opt.timestep)
@@ -50,7 +50,7 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
         if len(ac.shape) > 1:
             ac = ac[0]
         acs.append(ac)
-        ob, rew, done, _ = env.step(ac)
+        ob, rew, done, info = env.step(ac)
 
         if len(ob.shape) == 3:
             ob_fifo_queue.append(ob)
@@ -58,6 +58,7 @@ def sample_trajectory(env, policy, max_path_length, render=False, render_mode=('
         # record result of taking that action
         next_obs.append(ob)
         rewards.append(rew)
+        infos.append(info)
         steps += 1
 
         # If the episode ended, the corresponding terminal value is 1

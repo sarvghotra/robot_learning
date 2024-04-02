@@ -22,7 +22,7 @@ from hw2.roble.infrastructure.rl_trainer import RL_Trainer
 
 # how many rollouts to save as videos
 MAX_NVIDEO = 1
-MAX_VIDEO_LEN = 40 # we overwrite this in the code below
+MAX_VIDEO_LEN = 500 # we overwrite this in the code below
 
 class RL_Trainer(RL_Trainer):
     import hw1.roble.util.class_util as classu
@@ -194,7 +194,7 @@ class RL_Trainer(RL_Trainer):
 
         for key, value in logs.items():
             print('{} : {}'.format(key, value))
-            self._logger.record_tabular_misc_stat(key, value)
+            self._logger.record_tabular_misc_stat(key, value, itr)
 
         self._logger.dump_tabular()
         print('Done DQN logging...\n\n')
@@ -255,7 +255,7 @@ class RL_Trainer(RL_Trainer):
                 logs["Actor_Loss"] = actor_loss
 
         for key in logs.keys():
-                self._logger.record_tabular_misc_stat(key, logs[key])
+                self._logger.record_tabular_misc_stat(key, logs[key], itr)
 
         # self._logger.record_tabular_misc_stat("eval_reward", logs["eval_reward"])
         self._logger.dump_tabular()
@@ -272,7 +272,7 @@ class RL_Trainer(RL_Trainer):
                 )
         super().perform_logging(itr, paths, eval_policy, train_video_paths, all_logs)
 
-        print('Done logging ddpg...\n\n')
+        print('Done logging...\n\n')
 
     def collect_training_trajectories(
             self,

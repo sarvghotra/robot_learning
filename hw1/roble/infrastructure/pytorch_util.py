@@ -71,7 +71,7 @@ def init_gpu(use_gpu=True, gpu_id=0):
     else:
         print("torch.cuda.is_available(): ", torch.cuda.is_available())
         print("use_gpu: ", use_gpu)
-        raise RuntimeError("GPU not found")
+        # raise RuntimeError("GPU not found")
         device = torch.device("cpu")
         print("GPU not detected. Defaulting to CPU.")
 

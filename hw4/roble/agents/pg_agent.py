@@ -20,10 +20,11 @@ class PGAgent(BaseAgent):
             self._gae_lambda = None
 
         # actor/policy
+        kwargs['is_critic'] = False
         self._actor = MLPPolicyPG(
             **kwargs
         )
-        
+
         # create the critic (baseline) network, if needed
 #         if self._use_baseline:
 #            self._critic = BootstrappedContinuousCritic(
@@ -46,34 +47,34 @@ class PGAgent(BaseAgent):
         advantages = self.estimate_advantage(observations, rewards_list, q_values, terminals)
         # advantages = advantages / np.std(advantages) ## Try to keep the statistics of the advantages standardized
         train_log = self._actor.update(observations, actions, advantages=advantages, q_values=q_values)
-        
+
         # for critic_update in range(self._num_critic_updates_per_agent_update):
         #     log_ = self._q_fun.update(ob_no, ac_na, next_ob_no, re_n, terminal_n)
 
         return train_log
 
     def calculate_q_vals(self, rews_list):
-        
+
         """
             Monte Carlo estimation of the Q function.
         """
-        
+
         # Case 1: trajectory-based PG
         # Estimate Q^{pi}(s_t, a_t) by the total discounted reward summed over entire trajectory
         if not self._reward_to_go:
-        
+
             # For each point (s_t, a_t), associate its value as being the discounted sum of rewards over the full trajectory
             # In other words: value of (s_t, a_t) = sum_{t'=0}^T gamma^t' r_{t'}
             q_values = np.concatenate([self._discounted_return(r) for r in rews_list])
-        
+
         # Case 2: reward-to-go PG
         # Estimate Q^{pi}(s_t, a_t) by the discounted sum of rewards starting from t
         else:
-        
+
             # For each point (s_t, a_t), associate its value as being the discounted sum of rewards over the full trajectory
             # In other words: value of (s_t, a_t) = sum_{t'=t}^T gamma^(t'-t) * r_{t'}
             q_values = np.concatenate([self._discounted_cumsum(r) for r in rews_list])
-        
+
         return q_values
 
 
@@ -97,13 +98,13 @@ class PGAgent(BaseAgent):
             # if self._standardize_advantages:
             values_normalized = (values_unnormalized - values_unnormalized.mean()) / (values_unnormalized.std() + 1e-8)
             values = values_normalized * np.std(q_values) + np.mean(q_values)
-            
+
             # values = values_unnormalized * (1 / (1.0 - self._gamma))
 
             if self._gae_lambda is not None:
                 ## append a dummy T+1 value for simpler recursive calculation
                 values = np.append(values, [0])
-                
+
                 ## combine rews_list into a single array
                 rews = np.concatenate(rews_list)
 
@@ -115,7 +116,7 @@ class PGAgent(BaseAgent):
                 for i in reversed(range(batch_size)):
                     ended = 1 - terminals[i]
                     delta_t = rews[i] + (self._gamma * values[i+1] * ended) - values[i]
-                    advantages[i] = delta_t + (self._gae_lambda * self._gamma * advantages[i+1] * ended) 
+                    advantages[i] = delta_t + (self._gae_lambda * self._gamma * advantages[i+1] * ended)
 
                 # remove dummy advantage
                 advantages = advantages[:-1]
@@ -137,7 +138,7 @@ class PGAgent(BaseAgent):
 
     def add_to_replay_buffer(self, paths):
         self._replay_buffer.add_rollouts(paths)
-        
+
     def clear_mem(self):
         self._replay_buffer.reset()
 
@@ -154,31 +155,31 @@ class PGAgent(BaseAgent):
     def _discounted_return(self, rewards):
         """
             Helper function
-    
+
             Input: list of rewards {r_0, r_1, ..., r_t', ... r_T} from a single rollout of length T
-    
+
             Output: list where each index t contains sum_{t'=0}^T gamma^t' r_{t'}
                 note that all entries of this output are equivalent
                 because each sum is from 0 to T (and doesnt involve t)
         """
-    
+
         # create a list of indices (t'): from 0 to T
         indices = np.arange(len(rewards))
-    
+
         # create a list where the entry at each index (t') is gamma^(t')
         discounts = self._gamma**indices
-    
+
         # create a list where the entry at each index (t') is gamma^(t') * r_{t'}
         discounted_rewards = discounts * rewards
-    
+
         # scalar: sum_{t'=0}^T gamma^(t') * r_{t'}
         sum_of_discounted_rewards = sum(discounted_rewards)
-    
+
         # list where each entry t contains the same thing
             # it contains sum_{t'=0}^T gamma^t' r_{t'}
         ##TODO this is not implimented properly.
         list_of_discounted_returns = np.ones_like(rewards) * sum_of_discounted_rewards
-    
+
         return list_of_discounted_returns
 
     def _discounted_cumsum(self, rewards):
@@ -187,27 +188,27 @@ class PGAgent(BaseAgent):
             -takes a list of rewards {r_0, r_1, ..., r_t', ... r_T},
             -and returns a list where the entry in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}
         """
-    
+
         all_discounted_cumsums = []
-    
+
         # for loop over steps (t) of the given rollout
         for start_time_index in range(len(rewards)):
-    
+
             # create a list of indices (t'): goes from t to T
             indices = np.arange(start_time_index, len(rewards))
-    
+
             # create a list of indices (t'-t)
             indices_adjusted = indices - start_time_index
-    
+
             # create a list where the entry at each index (t') is gamma^(t'-t)
             discounts = self._gamma**(indices_adjusted) # each entry is gamma^(t'-t)
-    
+
             # create a list where the entry at each index (t') is gamma^(t'-t) * r_{t'}
             discounted_rtg = discounts * rewards[start_time_index:]
-    
+
             # scalar: sum_{t'=t}^T gamma^(t'-t) * r_{t'}
             sum_discounted_rtg = sum(discounted_rtg)
             all_discounted_cumsums.append(sum_discounted_rtg)
-    
+
         list_of_discounted_cumsums = np.array(all_discounted_cumsums)
         return list_of_discounted_cumsums

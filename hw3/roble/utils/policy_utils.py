@@ -43,7 +43,11 @@ class SquashedNormal(pyd.transformed_distribution.TransformedDistribution):
         self.scale = scale
 
         # self.base_dist = pyd.Normal(loc, scale)
-        self.base_dist = pyd.multivariate_normal.MultivariateNormal(loc, torch.eye(scale.shape[0]).to('cuda') * scale ** 2)
+        if torch.cuda.is_available():
+            std = torch.eye(scale.shape[0]).to('cuda') * scale.to('cuda') ** 2
+        else:
+            std = torch.eye(scale.shape[0]) * scale ** 2
+        self.base_dist = pyd.multivariate_normal.MultivariateNormal(loc, std)
 
         transforms = [TanhTransform()]
         super().__init__(self.base_dist, transforms)

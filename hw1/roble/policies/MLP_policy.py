@@ -65,7 +65,8 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             self._baseline = ptu.build_mlp(
                 input_size=self._ob_dim,
                 output_size=1,
-                params=self._network
+                params=self._network,
+                is_critic=False
             )
             self._baseline.to(ptu.device)
             self._baseline_optimizer = optim.Adam(
@@ -132,8 +133,10 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
                 # action_distribution = TODO
                 # FIXME: double check it with another implementation
                 # z = self._norm_dist.sample().to(ptu.device)
-                std = torch.exp(self._logstd)
+
+                std = self._std
                 # action_distribution = distributions.Normal(self._mean_net(observation), std)
+                observation = observation.to(ptu.device)
                 action_distribution = SquashedNormal(self._mean_net(observation), std)
         return action_distribution
     ##################################

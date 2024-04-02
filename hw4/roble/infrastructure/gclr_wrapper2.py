@@ -194,26 +194,69 @@ class GoalConditionedEnvV2(GoalConditionedEnv):
     @classu.hidden_member_initialize
     def __init__(self, base_env, **kwargs):
         super().__init__(base_env, **kwargs)
-        # TODO
-        super().__init__(base_env, **kwargs)
-        self._env = base_env
+        # # TODO
+        # super().__init__(base_env, **kwargs)
+        # self._env = base_env
+        self.goal_frequency = kwargs['goal_frequency']
+        self.curr_goal_t = 1
 
     def reset(self):
-        # Add code to generate a goal from a distribution
-        # TODO
-        pass
+        return super().reset()
 
-    def success_fn(self,last_reward):
-        # TODO
-        pass
+    # def success_fn(self,last_reward):
+    #     # TODO
+    #     pass
 
     def reset_step_counter(self):
         # Add code to track how long the current goal has been used.
         # TODO
-        pass
+        self.curr_goal_t = 1
+
+    def _reacher_reset_goal(self, goal_pos):
+        self._env.model.site_pos[self._env.target_sid] = goal_pos
+        self._env.sim.forward()
+
+    def _widowx_reset_goal(self, goal_pos):
+        self._env.ee_target_pose = goal_pos
+
+    def reset_goal(self, agent_pos):
+        # assert self.goal_rep != 'relative', "Not implemented for relative goal"
+        goal_pos = list(self._sample_goal(agent_pos))
+
+        if isinstance(self._env.unwrapped, Widow250EEPositionEnv):
+            self._widowx_reset_goal(goal_pos)
+        else:
+            self._reacher_reset_goal(goal_pos)
 
     def step(self, a):
         ## Add code to control the agent for a number of timesteps and
         ## change goals after k timesteps.
         # TODO
-        pass
+
+        ob, reward, done, info = super().step(a)
+
+        if self.curr_goal_t > self.goal_frequency:
+            self.reset_step_counter()
+            agent_pos = ob[self.agent_pos_ids]
+            self.reset_goal(agent_pos)
+            ob = self._env._get_obs()
+            if self.goal_rep == 'relative':
+                goal_pos = np.array(self._env.model.site_pos[self._env.target_sid])
+                ob = self.create_state(ob, goal_pos)
+        else:
+            self.curr_goal_t += 1
+
+        return ob, reward, done, info
+
+    # @property
+    # def action_space(self):
+    #     return self._env.action_space
+    # @property
+    # def observation_space(self):
+    #     return self._observation_space
+    # @property
+    # def metadata(self):
+    #     return self._env.metadata
+    # @property
+    # def unwrapped(self):
+    #     return self._env

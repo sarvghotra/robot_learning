@@ -16,7 +16,7 @@ from hw1.roble.infrastructure import utils
 
 # how many rollouts to save as videos to tensorboard
 MAX_NVIDEO = 1
-MAX_VIDEO_LEN = 40  # we overwrite this in the code below
+MAX_VIDEO_LEN = 500  # we overwrite this in the code below
 
 
 class RL_Trainer(object):
@@ -99,6 +99,7 @@ class RL_Trainer(object):
         except:
             pass
 
+        self.combined_params = combined_params
         self.add_wrappers()
         self._agent = agent_class(self._env, **combined_params)
         self._log_video = False
@@ -325,8 +326,8 @@ class RL_Trainer(object):
         print("\nCollecting data for eval...")
         eval_paths, eval_envsteps_this_batch = utils.sample_trajectories(self._env, eval_policy,
                                                                          self._params['alg']['eval_batch_size'],
-                                                                         self._params['env']['max_episode_length'],
-                                                                         render=False, render_mode=self._params['env']['render_mode'])
+                                                                         self._params['env']['max_episode_length'],)
+                                                                        #  render=False, render_mode=self._params['env']['render_mode'])
 
         # save eval rollouts as videos in the video folder (for grading)
         if self._log_video:
@@ -336,7 +337,7 @@ class RL_Trainer(object):
                 self._logger.log_paths_as_videos(train_video_paths, itr, fps=self._fps, max_videos_to_save=MAX_NVIDEO,
                                             video_title='train_rollouts')
             print('\nCollecting video rollouts eval')
-            eval_video_paths = utils.sample_n_trajectories(self._env, eval_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True, render_mode=self._params['env']['render_mode'])
+            eval_video_paths = utils.sample_n_trajectories(self._env, eval_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True) #, render_mode=self._params['env']['render_mode'])
             print('\nSaving eval rollouts as videos...')
             self._logger.log_paths_as_videos(eval_video_paths, itr, fps=self._fps,max_videos_to_save=MAX_NVIDEO,
                                             video_title='eval_rollouts')
@@ -375,7 +376,7 @@ class RL_Trainer(object):
 
             for key in logs.keys():
                 value = utils.flatten(logs[key])
-                self._logger.record_tabular_misc_stat(key, value)
+                self._logger.record_tabular_misc_stat(key, value, itr)
 
             # self._logger.record_tabular_misc_stat("eval_reward", logs["eval_reward"])
             self._logger.dump_tabular()

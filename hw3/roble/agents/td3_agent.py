@@ -126,3 +126,6 @@ class TD3Agent(object):
             self._num_param_updates += 1
         self._t += 1
         return log
+
+    def save(self, path):
+        self._actor.save(path)

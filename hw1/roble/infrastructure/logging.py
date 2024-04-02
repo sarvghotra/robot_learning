@@ -101,10 +101,10 @@ class Logger(object):
 
     def set_comet_logger(self, log):
         self._comet_log = log
-        
+
     def get_comet_logger(self):
         return self._comet_log
-        
+
     def _add_output(self, file_name, arr, fds, mode='a'):
         if file_name not in arr:
             mkdir_p(os.path.dirname(file_name))
@@ -133,7 +133,7 @@ class Logger(object):
             file_name = osp.join(self._snapshot_dir, file_name)
         self._add_output(file_name, self._tabular_outputs, self._tabular_fds,
                          mode='w')
-        
+
     def add_folder_output(self, folder_name, relative_to_snapshot_dir=False):
         from pathlib import Path
         self._log_video_path = Path(folder_name, 'videos')
@@ -186,21 +186,21 @@ class Logger(object):
                 fd.flush()
             sys.stdout.flush()
 
-    def record_tabular(self, key, val):
+    def record_tabular(self, key, val, step):
         self._tabular.append((self._tabular_prefix_str + str(key), str(val)))
         ### Use to keep track of results to export for testing
         if not self._tabular_prefix_str + str(key) in self._tabular_old.keys():
             self._tabular_old[self._tabular_prefix_str + str(key)] = []
         self._tabular_old[self._tabular_prefix_str + str(key)].append(val)
         if (self._comet_log is not None):
-            self._comet_log.log_metrics({str(self._tabular_prefix_str) + str(key): val})
+            self._comet_log.log_metrics({str(self._tabular_prefix_str) + str(key): val}, step=step)
 #             logger.set_step(step=settings["round"])
 
-    def record_dict(self, d, prefix=None):
+    def record_dict(self, d, step, prefix=None):
         if prefix is not None:
             self.push_tabular_prefix(prefix)
         for k, v in d.items():
-            self.record_tabular(k, v)
+            self.record_tabular(k, v, step)
         if prefix is not None:
             self.pop_tabular_prefix()
 
@@ -253,7 +253,7 @@ class Logger(object):
         with open(log_file, "w") as f:
             json.dump(variant_data, f, indent=2, sort_keys=True, cls=MyEncoder)
 
-    def record_tabular_misc_stat(self, key, values, placement='back'):
+    def record_tabular_misc_stat(self, key, values, step, placement='back'):
         if placement == 'front':
             prefix = ""
             suffix = key
@@ -261,17 +261,17 @@ class Logger(object):
             prefix = key
             suffix = ""
         # print ("key: ", key)
-        if (isinstance(values, list) and (len(values) > 0) and 
+        if (isinstance(values, list) and (len(values) > 0) and
              True ):
             # print ("values: ", key, values)
             ## Hint: Make sure value is a scaler or single dimensional vector
-            self.record_tabular(prefix + "_Average" + suffix, np.average(values))
-            self.record_tabular(prefix + "_Std" + suffix, np.std(values))
-            self.record_tabular(prefix + "_Median" + suffix, np.median(values))
-            self.record_tabular(prefix + "_Min" + suffix, np.min(values))
-            self.record_tabular(prefix + "_Max" + suffix, np.max(values))
+            self.record_tabular(prefix + "_Average" + suffix, np.average(values), step)
+            self.record_tabular(prefix + "_Std" + suffix, np.std(values), step)
+            self.record_tabular(prefix + "_Median" + suffix, np.median(values), step)
+            self.record_tabular(prefix + "_Min" + suffix, np.min(values), step)
+            self.record_tabular(prefix + "_Max" + suffix, np.max(values), step)
         else:
-            self.record_tabular(prefix + suffix, values)
+            self.record_tabular(prefix + suffix, values, step)
 
     def dump_tabular(self, *args, **kwargs):
         wh = kwargs.pop("write_header", None)
@@ -322,17 +322,17 @@ class Logger(object):
                 pass
             else:
                 raise NotImplementedError
-            
+
     def log_video_file(self, video_frames, name, step, fps=10):
         assert len(video_frames.shape) == 5, "Need [N, T, C, H, W] input tensor for video logging!"
-        from moviepy.editor import ImageSequenceClip   
+        from moviepy.editor import ImageSequenceClip
         # only record the last rollout
         video_frames  = video_frames.transpose(0, 1, 3, 4, 2)
         for video_idx in range(len(video_frames)):
             clip = ImageSequenceClip(list(video_frames[video_idx]), fps=fps)
             clip_name = f'{name}_step_{step}_video{video_idx+1}.mp4'
             clip.write_videofile(str(self._log_video_path / clip_name), fps=fps, verbose=False)
-            
+
     def log_paths_as_videos(self, paths, step, max_videos_to_save=2, fps=10, video_title='video'):
 
         # reshape the rollouts
@@ -353,7 +353,7 @@ class Logger(object):
 
         # log videos to tensorboard event file
         videos = np.stack(videos[:max_videos_to_save], 0)
-        
+
         # self.log_video(videos, video_title, step, fps=fps) # Disable video logging tensorboard
 
         # Add the recorded video to the video folder only for evaluation video

@@ -16,17 +16,20 @@ from hw3.roble.agents.ddpg_agent import DDPGAgent
 from hw3.roble.agents.td3_agent import TD3Agent
 from hw3.roble.agents.sac_agent import SACAgent
 from hw4.roble.agents.pg_agent import PGAgent
+from hw3.roble.policies.MLP_policy import MLPPolicyDeterministic
 
 from hw3.roble.infrastructure.dqn_utils import (
         get_wrapper_by_name
 )
-from hw4.roble.envs.ant.create_maze_env import create_maze_env
+# from hw4.roble.envs.ant.create_maze_env import create_maze_env
 from hw4.roble.envs.reacher.reacher_env import create_reacher_env
-from hw4.roble.infrastructure.gclr_wrapper import GoalConditionedEnv, GoalConditionedEnvV2
+from hw4.roble.infrastructure.gclr_wrapper import GoalConditionedEnv
+from hw4.roble.infrastructure.gclr_wrapper2 import GoalConditionedEnvV2
+from hw4.roble.infrastructure.gclr_wrapper_relative import RelativeGoalConditionedEnv
 from hw4.roble.infrastructure.hrl_wrapper import HRLWrapper
 # how many rollouts to save as videos
 MAX_NVIDEO = 1
-MAX_VIDEO_LEN = 40 # we overwrite this in the code below
+MAX_VIDEO_LEN = 500 # we overwrite this in the code below
 
 class RL_Trainer(RL_Trainer):
     import hw1.roble.util.class_util as classu
@@ -38,7 +41,27 @@ class RL_Trainer(RL_Trainer):
         #############
         # Inherit from hw1 RL_Trainer
         super().__init__(params, agent_class)
-        
+
+        if params['env']['task_name'] == 'hrl':
+            self.combined_params['is_critic'] = False
+            # _ob_dim,
+            # output_size=self._ac_dim,
+            # params=self._network
+            o_ob_dim = self.combined_params['ob_dim']
+            o_ac_dim = self.combined_params['ac_dim']
+            if params['env']['env_name'] == 'reacher':
+                ob_dim = self._env.base_env.observation_space.shape[0]
+                ac_dim = self._env.base_env.action_space.n if params['alg']['discrete'] else self._env.base_env.action_space.shape[0]
+
+                self.combined_params['ob_dim'] = ob_dim
+                self.combined_params['ac_dim'] = ac_dim
+                self.combined_params['action_scale'] = self._env.base_env.action_space.high[0]
+
+            self.low_level_policy = MLPPolicyDeterministic(**self.combined_params)
+            self._env.set_low_level_policy(self.low_level_policy, params['env']['low_level_policy_path'])
+
+            self.combined_params['ob_dim'] = o_ob_dim
+            self.combined_params['ac_dim'] = o_ac_dim
 
         # Get params, create logger
         self._params = params
@@ -112,7 +135,7 @@ class RL_Trainer(RL_Trainer):
                 self._log_metrics = False
 
             # collect trajectories, to be used for training
-            if isinstance(self._agent, DQNAgent) or isinstance(self._agent, DDPGAgent):
+            if isinstance(self._agent, DQNAgent) or isinstance(self._agent, DDPGAgent) or isinstance(self._agent, TD3Agent):
                 # only perform an env step and add to replay buffer for DQN and DDPG
                 self._agent.step_env()
                 envsteps_this_batch = 1
@@ -130,17 +153,17 @@ class RL_Trainer(RL_Trainer):
             self._total_envsteps += envsteps_this_batch
 
             # add collected data to replay buffer
-            
+
             # print("collected ", len(paths[0]), " trajectories")
             self._agent.add_to_replay_buffer(paths)
 
             # train agent (using sampled data from replay buffer)
             # print("\nTraining agent...")
             all_logs = self.train_agent()
-    
+
 
             # log/save
-            if ((self._log_video or self._log_metrics) and 
+            if ((self._log_video or self._log_metrics) and
                 (len(all_logs) >= 1)):
                 # perform logging
                 print('\nBeginning logging procedure...')
@@ -149,15 +172,16 @@ class RL_Trainer(RL_Trainer):
                 else:
                     self.perform_logging(itr, eval_policy, all_logs)
 
-                if self._params['logging']['save_params']:
-                    self._agent.save('{}/agent_itr_{}.pt'.format(self._params['logging']['logdir'], itr))
-            if  self._params['alg']['on_policy']:       
+            if self._params['logging']['save_params'] and itr > 0 and (itr % self._params['logging']['save_params_freq'] == 0):
+                self._agent.save('{}/agent_itr_{}.pt'.format(self._params['logging']['logdir'], itr))
+
+            if  self._params['alg']['on_policy']:
                 self._agent.clear_mem()
 
 
     ####################################
     ####################################
-        
+
     def create_env(self, env_name, seed):
         import pybullet_envs
         if self._params['env']['env_name'] == 'antmaze':
@@ -169,17 +193,19 @@ class RL_Trainer(RL_Trainer):
             self._env = create_widow_env(observation_mode='state')
         else:
             self._env = gym.make(env_name)
-            
+
                 # Call your goal conditioned wrapper here (You can modify arguments depending on your implementation)
-        if self._params['env']['task_name'] == 'gcrl':
-            self._env = GoalConditionedEnv(self._env, **self._params['env'])     
+        if self._params['env']['goal_rep'] == 'relative' and self._params['env']['env_name'] == 'widowx':
+            self._env = RelativeGoalConditionedEnv(self._env, **self._params['env'])
+        elif self._params['env']['task_name'] == 'gcrl':
+            self._env = GoalConditionedEnv(self._env, **self._params['env'])
         elif self._params['env']['task_name'] == 'gcrl_v2':
-            self._env = GoalConditionedEnvV2(self._env, self._params['env'])
+            self._env = GoalConditionedEnvV2(self._env, **self._params['env'])
         elif self._params['env']['task_name'] == 'hrl':
-            self._env = HRLWrapper(self._env, self._params['env'])
+            self._env = HRLWrapper(self._env, **self._params['env'])
         else:
             pass
-        
+
         self._env.seed(seed)
         # self._eval_env.seed(seed)
         np.random.seed(seed)
